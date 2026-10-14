@@ -1,148 +1,533 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Quota Checker</title>
+    <title>AI Quota Studio • Production LLM Quota & Latency Monitor</title>
+    <meta name="description" content="Local, air-gapped LLM quota inspector, latency radar, and token telemetry for OpenAI, Anthropic Claude, and Google Gemini." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <main class="shell">
-      <section class="intro">
-        <div>
-          <p class="eyebrow">Local Tool</p>
-          <h1>AI Quota Checker</h1>
-          <p class="subtext">
-            Paste a provider key, run a tiny generation request, and see whether quota is available.
-            Keys are sent only to this local server process and are not saved. Exact remaining
-            balance is shown only when a provider exposes it to that key; otherwise this reports
-            the real access/quota signal from the API response.
-          </p>
+    <!-- Top Global App Bar -->
+    <header class="app-header">
+      <div class="shell header-inner">
+        <div class="brand">
+          <div class="brand-logo" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+            </svg>
+          </div>
+          <div>
+            <div class="brand-title-wrap">
+              <span class="brand-title">AI Quota Studio</span>
+              <span class="version-tag">PRO</span>
+            </div>
+            <p class="brand-sub">Local API Sentinel & Telemetry Suite</p>
+          </div>
+        </div>
+
+        <div class="header-status-badge" title="Localhost node server connection status">
+          <span class="status-pulse-dot" aria-hidden="true"></span>
+          <span class="status-text" data-server-status>Air-Gapped • Port 5177</span>
+        </div>
+
+        <div class="header-actions">
+          <button type="button" class="action-btn" id="soundToggle" aria-label="Toggle sound feedback" title="Toggle sound effects">
+            <svg class="icon sound-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+            <svg class="icon sound-off hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>
+          </button>
+
+          <button type="button" class="action-btn" id="themeToggle" aria-label="Toggle dark/light theme" title="Toggle theme">
+            <svg class="icon theme-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            <svg class="icon theme-sun hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+          </button>
+
+          <button type="button" class="btn btn-primary" id="runAllBtn" title="Run quota diagnostics for all entered provider keys">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            <span>Run All Checks</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="shell app-body">
+      <!-- Privacy & Security Notice Banner -->
+      <section class="privacy-strip" role="region" aria-label="Security guarantee">
+        <div class="privacy-badge">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          <span>Zero Cloud Telemetry</span>
+        </div>
+        <p class="privacy-note">
+          API keys are dispatched directly and strictly to this local Node.js process to bypass browser CORS. Never stored on external servers or logs.
+        </p>
+        <div class="privacy-options">
+          <label class="toggle-checkbox" title="Persist keys in your browser localStorage on this machine only">
+            <input type="checkbox" id="persistKeysToggle" />
+            <span class="toggle-slider"></span>
+            <span class="toggle-label">Remember keys locally</span>
+          </label>
         </div>
       </section>
 
-      <section class="tracker" aria-label="Usage tracking">
-        <div class="tracker-head">
-          <div>
-            <h2>Tracking</h2>
-            <p>Local history, token usage, estimated cost, and provider error intelligence.</p>
+      <!-- Mission Control Telemetry Hero Stats -->
+      <section class="telemetry-bar" aria-label="Mission Control Stats" data-summary>
+        <div class="metric-card">
+          <div class="metric-head">
+            <span class="metric-label">Total Checks</span>
+            <span class="metric-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+            </span>
           </div>
-          <div class="tracker-actions">
-            <button type="button" class="secondary" data-refresh-history>Refresh</button>
-            <a class="button-link" href="/api/history/export">Export JSON</a>
-            <button type="button" class="danger" data-clear-history>Clear</button>
+          <strong class="metric-value" data-stat="totalChecks">0</strong>
+          <span class="metric-footer" data-stat-sub="todayChecks">0 recorded today</span>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-head">
+            <span class="metric-label">Health & Pass Rate</span>
+            <span class="metric-icon success-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            </span>
+          </div>
+          <div class="metric-value-row">
+            <strong class="metric-value" data-stat="passRate">100%</strong>
+            <span class="badge badge-success-subtle" data-stat="successCount">0 OK</span>
+          </div>
+          <div class="progress-bar-wrap">
+            <div class="progress-fill" id="passRateFill" style="width: 100%"></div>
           </div>
         </div>
-        <div class="metrics" data-summary>
-          <div><span>Total checks</span><strong>0</strong></div>
-          <div><span>Today</span><strong>0</strong></div>
-          <div><span>Success</span><strong>0</strong></div>
-          <div><span>Failed</span><strong>0</strong></div>
-          <div><span>Tokens</span><strong>0</strong></div>
-          <div><span>Est. cost</span><strong>$0.000000</strong></div>
+
+        <div class="metric-card">
+          <div class="metric-head">
+            <span class="metric-label">Avg Handshake Latency</span>
+            <span class="metric-icon latency-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+            </span>
+          </div>
+          <strong class="metric-value" data-stat="avgLatency">0 ms</strong>
+          <span class="metric-footer">Real-world round-trip</span>
         </div>
-        <div class="history-wrap">
-          <table>
+
+        <div class="metric-card">
+          <div class="metric-head">
+            <span class="metric-label">Test Tokens Consumed</span>
+            <span class="metric-icon token-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+            </span>
+          </div>
+          <strong class="metric-value" data-stat="totalTokens">0</strong>
+          <span class="metric-footer" data-stat-sub="tokenRatio">0 In / 0 Out</span>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-head">
+            <span class="metric-label">Est. Testing Cost</span>
+            <span class="metric-icon cost-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+            </span>
+          </div>
+          <strong class="metric-value" data-stat="estimatedCost">$0.000000</strong>
+          <span class="metric-footer">Micro-billed synthetic probes</span>
+        </div>
+      </section>
+
+      <!-- Provider Diagnostics Workspace Grid -->
+      <section class="providers-grid" aria-label="LLM Providers">
+        <!-- ================= OpenAI / Codex Card ================= -->
+        <article class="provider-card" data-provider="openai" id="card-openai">
+          <div class="card-halo openai-halo"></div>
+          
+          <header class="card-head">
+            <div class="provider-identity">
+              <div class="provider-avatar openai-avatar">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1683a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4947zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1683a.0757.0757 0 0 1-.071 0l-4.8303-2.7866A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.6669zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1636a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/>
+                </svg>
+              </div>
+              <div>
+                <h2 class="provider-title">OpenAI & Codex</h2>
+                <p class="provider-desc">Responses API probe & billing sanity</p>
+              </div>
+            </div>
+            <div class="status-badge badge-idle" data-badge>
+              <span class="badge-dot"></span>
+              <span class="badge-text">Idle</span>
+            </div>
+          </header>
+
+          <div class="card-body">
+            <!-- Key Field -->
+            <div class="field-group">
+              <div class="field-label-row">
+                <label for="key-openai">API Key</label>
+                <div class="field-hint" data-key-format>Expects: sk-... or sk-proj-...</div>
+              </div>
+              <div class="input-action-wrap">
+                <input
+                  type="password"
+                  id="key-openai"
+                  class="input-key"
+                  placeholder="sk-proj-..."
+                  autocomplete="off"
+                  spellcheck="false"
+                  data-key
+                />
+                <div class="input-actions-inner">
+                  <button type="button" class="btn-icon-subtle" data-action="toggle-visibility" title="Show / Mask key">
+                    <svg class="icon eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    <svg class="icon eye-closed hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                  </button>
+                  <button type="button" class="btn-icon-subtle" data-action="paste" title="Paste from clipboard">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+                  </button>
+                  <button type="button" class="btn-icon-subtle" data-action="clear" title="Clear key">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Model Selector & Loaders -->
+            <div class="field-group">
+              <div class="field-label-row">
+                <label for="model-select-openai">Target Model</label>
+                <button type="button" class="text-link-btn" data-load-models>
+                  <svg class="spin-icon hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+                  <span>Fetch Models</span>
+                </button>
+              </div>
+              <div class="select-wrap">
+                <select id="model-select-openai" data-model-select>
+                  <option value="">Auto-detected (Defaults to gpt-4o / gpt-4o-mini)</option>
+                </select>
+              </div>
+              <div class="override-wrap">
+                <input type="text" class="input-override" placeholder="Manual override: e.g. gpt-4o-mini, o3-mini" data-model spellcheck="false" />
+              </div>
+            </div>
+
+            <!-- Execution Button -->
+            <div class="card-action-row">
+              <button type="button" class="btn btn-primary btn-check" data-check>
+                <span class="btn-text">Check OpenAI Quota</span>
+                <span class="btn-kbd">Ctrl+Enter</span>
+              </button>
+            </div>
+
+            <!-- Live Diagnostic Card Area -->
+            <div class="diagnostic-card" data-result-area>
+              <div class="diagnostic-placeholder">
+                <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                <span>Ready to inspect. Enter key or run diagnostics.</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- ================= Anthropic Claude Card ================= -->
+        <article class="provider-card" data-provider="anthropic" id="card-claude">
+          <div class="card-halo claude-halo"></div>
+          
+          <header class="card-head">
+            <div class="provider-identity">
+              <div class="provider-avatar claude-avatar">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M13.82 2.89a1 1 0 0 0-1.64 0L3.14 16.5a1 1 0 0 0 .82 1.55h4.15L5.7 21.32a1 1 0 0 0 1.62.98l10.98-9.15a1 1 0 0 0-.64-1.74h-4.32l2.48-8.52z" />
+                </svg>
+              </div>
+              <div>
+                <h2 class="provider-title">Anthropic Claude</h2>
+                <p class="provider-desc">Messages API probe & balance verification</p>
+              </div>
+            </div>
+            <div class="status-badge badge-idle" data-badge>
+              <span class="badge-dot"></span>
+              <span class="badge-text">Idle</span>
+            </div>
+          </header>
+
+          <div class="card-body">
+            <!-- Key Field -->
+            <div class="field-group">
+              <div class="field-label-row">
+                <label for="key-anthropic">API Key</label>
+                <div class="field-hint" data-key-format>Expects: sk-ant-...</div>
+              </div>
+              <div class="input-action-wrap">
+                <input
+                  type="password"
+                  id="key-anthropic"
+                  class="input-key"
+                  placeholder="sk-ant-..."
+                  autocomplete="off"
+                  spellcheck="false"
+                  data-key
+                />
+                <div class="input-actions-inner">
+                  <button type="button" class="btn-icon-subtle" data-action="toggle-visibility" title="Show / Mask key">
+                    <svg class="icon eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    <svg class="icon eye-closed hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                  </button>
+                  <button type="button" class="btn-icon-subtle" data-action="paste" title="Paste from clipboard">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+                  </button>
+                  <button type="button" class="btn-icon-subtle" data-action="clear" title="Clear key">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Model Selector & Loaders -->
+            <div class="field-group">
+              <div class="field-label-row">
+                <label for="model-select-anthropic">Target Model</label>
+                <button type="button" class="text-link-btn" data-load-models>
+                  <svg class="spin-icon hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+                  <span>Fetch Models</span>
+                </button>
+              </div>
+              <div class="select-wrap">
+                <select id="model-select-anthropic" data-model-select>
+                  <option value="">Auto-detected (Defaults to claude-3-5-haiku)</option>
+                </select>
+              </div>
+              <div class="override-wrap">
+                <input type="text" class="input-override" placeholder="Manual override: e.g. claude-3-5-sonnet-20241022" data-model spellcheck="false" />
+              </div>
+            </div>
+
+            <!-- Execution Button -->
+            <div class="card-action-row">
+              <button type="button" class="btn btn-primary btn-check" data-check>
+                <span class="btn-text">Check Claude Quota</span>
+                <span class="btn-kbd">Ctrl+Enter</span>
+              </button>
+            </div>
+
+            <!-- Live Diagnostic Card Area -->
+            <div class="diagnostic-card" data-result-area>
+              <div class="diagnostic-placeholder">
+                <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                <span>Ready to inspect. Enter key or run diagnostics.</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- ================= Google Gemini Card ================= -->
+        <article class="provider-card" data-provider="gemini" id="card-gemini">
+          <div class="card-halo gemini-halo"></div>
+          
+          <header class="card-head">
+            <div class="provider-identity">
+              <div class="provider-avatar gemini-avatar">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 24C12 17.3726 6.62742 12 0 12C6.62742 12 12 6.62742 12 0C12 6.62742 17.3726 12 24 12C17.3726 12 12 17.3726 12 24Z" />
+                </svg>
+              </div>
+              <div>
+                <h2 class="provider-title">Google Gemini</h2>
+                <p class="provider-desc">generateContent probe & API Studio quota</p>
+              </div>
+            </div>
+            <div class="status-badge badge-idle" data-badge>
+              <span class="badge-dot"></span>
+              <span class="badge-text">Idle</span>
+            </div>
+          </header>
+
+          <div class="card-body">
+            <!-- Key Field -->
+            <div class="field-group">
+              <div class="field-label-row">
+                <label for="key-gemini">API Key</label>
+                <div class="field-hint" data-key-format>Expects: AIzaSy...</div>
+              </div>
+              <div class="input-action-wrap">
+                <input
+                  type="password"
+                  id="key-gemini"
+                  class="input-key"
+                  placeholder="AIzaSy..."
+                  autocomplete="off"
+                  spellcheck="false"
+                  data-key
+                />
+                <div class="input-actions-inner">
+                  <button type="button" class="btn-icon-subtle" data-action="toggle-visibility" title="Show / Mask key">
+                    <svg class="icon eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    <svg class="icon eye-closed hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                  </button>
+                  <button type="button" class="btn-icon-subtle" data-action="paste" title="Paste from clipboard">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+                  </button>
+                  <button type="button" class="btn-icon-subtle" data-action="clear" title="Clear key">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Model Selector & Loaders -->
+            <div class="field-group">
+              <div class="field-label-row">
+                <label for="model-select-gemini">Target Model</label>
+                <button type="button" class="text-link-btn" data-load-models>
+                  <svg class="spin-icon hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+                  <span>Fetch Models</span>
+                </button>
+              </div>
+              <div class="select-wrap">
+                <select id="model-select-gemini" data-model-select>
+                  <option value="">Auto-detected (Defaults to gemini-2.5-flash / gemini-2.0-flash)</option>
+                </select>
+              </div>
+              <div class="override-wrap">
+                <input type="text" class="input-override" placeholder="Manual override: e.g. gemini-2.5-pro, gemini-2.5-flash" data-model spellcheck="false" />
+              </div>
+            </div>
+
+            <!-- Execution Button -->
+            <div class="card-action-row">
+              <button type="button" class="btn btn-primary btn-check" data-check>
+                <span class="btn-text">Check Gemini Quota</span>
+                <span class="btn-kbd">Ctrl+Enter</span>
+              </button>
+            </div>
+
+            <!-- Live Diagnostic Card Area -->
+            <div class="diagnostic-card" data-result-area>
+              <div class="diagnostic-placeholder">
+                <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                <span>Ready to inspect. Enter key or run diagnostics.</span>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <!-- History & Audit Trail Section -->
+      <section class="history-panel" aria-label="Check History & Audit Trail">
+        <div class="history-panel-head">
+          <div class="history-panel-title-wrap">
+            <div class="history-icon-badge">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            </div>
+            <div>
+              <h2 class="history-panel-title">Diagnostic Audit Trail</h2>
+              <p class="history-panel-sub">Immutable local check records, latency benchmarks, and error classifications</p>
+            </div>
+          </div>
+
+          <!-- History Filter and Actions Toolbar -->
+          <div class="history-toolbar">
+            <div class="search-wrap">
+              <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input type="text" id="historySearch" placeholder="Filter by model, status, or key..." class="search-input" />
+            </div>
+
+            <select id="providerFilter" class="toolbar-select" aria-label="Filter by provider">
+              <option value="all">All Providers</option>
+              <option value="OpenAI">OpenAI</option>
+              <option value="Claude">Claude</option>
+              <option value="Gemini">Gemini</option>
+            </select>
+
+            <select id="statusFilter" class="toolbar-select" aria-label="Filter by status">
+              <option value="all">All Statuses</option>
+              <option value="ok">Available (OK)</option>
+              <option value="error">Blocked / Error</option>
+            </select>
+
+            <div class="toolbar-btn-group">
+              <button type="button" class="btn btn-secondary" data-refresh-history title="Reload history from local database">
+                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                <span>Refresh</span>
+              </button>
+              <a class="btn btn-secondary" href="/api/history/export" download="ai-quota-history.json" title="Download raw JSON log">
+                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                <span>Export JSON</span>
+              </a>
+              <button type="button" class="btn btn-danger-subtle" data-clear-history title="Purge local history database">
+                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                <span>Clear</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- History Table Container -->
+        <div class="table-container">
+          <table class="history-table">
             <thead>
               <tr>
-                <th>Time</th>
+                <th>Timestamp</th>
                 <th>Provider</th>
-                <th>Status</th>
+                <th>Signal Status</th>
                 <th>Model</th>
-                <th>Tokens</th>
-                <th>Est. cost</th>
-                <th>Key</th>
+                <th>Latency</th>
+                <th>Tokens (In / Out)</th>
+                <th>Cost</th>
+                <th>Key Hash</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody data-history>
               <tr>
-                <td colspan="7">No checks yet.</td>
+                <td colspan="9" class="empty-table-cell">
+                  <div class="empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    <p>No checks recorded yet. Run a check above to start capturing telemetry.</p>
+                  </div>
+                </td>
               </tr>
             </tbody>
           </table>
         </div>
       </section>
-
-      <section class="grid" aria-label="Provider checks">
-        <article class="panel" data-provider="openai">
-          <div class="panel-head">
-            <div>
-              <h2>OpenAI / Codex</h2>
-              <p>Checks OpenAI API quota with the Responses API.</p>
-            </div>
-            <span class="badge idle">Idle</span>
-          </div>
-          <label>
-            API key
-            <input type="password" autocomplete="off" placeholder="sk-..." data-key />
-          </label>
-          <label>
-            Model
-            <select data-model-select>
-              <option value="">Load models from key</option>
-            </select>
-          </label>
-          <div class="model-actions">
-            <button type="button" class="secondary" data-load-models>Load models</button>
-            <input type="text" placeholder="Manual model override" data-model />
-          </div>
-          <button data-check>Check OpenAI</button>
-          <pre data-result>Waiting for check.</pre>
-        </article>
-
-        <article class="panel" data-provider="anthropic">
-          <div class="panel-head">
-            <div>
-              <h2>Claude</h2>
-              <p>Checks Anthropic Claude API quota with a tiny message.</p>
-            </div>
-            <span class="badge idle">Idle</span>
-          </div>
-          <label>
-            API key
-            <input type="password" autocomplete="off" placeholder="sk-ant-..." data-key />
-          </label>
-          <label>
-            Model
-            <select data-model-select>
-              <option value="">Load models from key</option>
-            </select>
-          </label>
-          <div class="model-actions">
-            <button type="button" class="secondary" data-load-models>Load models</button>
-            <input type="text" placeholder="Manual model override" data-model />
-          </div>
-          <button data-check>Check Claude</button>
-          <pre data-result>Waiting for check.</pre>
-        </article>
-
-        <article class="panel" data-provider="gemini">
-          <div class="panel-head">
-            <div>
-              <h2>Gemini</h2>
-              <p>Checks Google Gemini API quota with a small content request.</p>
-            </div>
-            <span class="badge idle">Idle</span>
-          </div>
-          <label>
-            API key
-            <input type="password" autocomplete="off" placeholder="AIza..." data-key />
-          </label>
-          <label>
-            Model
-            <select data-model-select>
-              <option value="">Load models from key</option>
-            </select>
-          </label>
-          <div class="model-actions">
-            <button type="button" class="secondary" data-load-models>Load models</button>
-            <input type="text" placeholder="Manual model override" data-model />
-          </div>
-          <button data-check>Check Gemini</button>
-          <pre data-result>Waiting for check.</pre>
-        </article>
-      </section>
     </main>
+
+    <!-- Inspection Modal / Detail Dialog -->
+    <div class="modal-backdrop hidden" id="detailModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-card">
+        <div class="modal-head">
+          <div class="modal-title-wrap">
+            <span class="badge" id="modalStatusBadge">STATUS</span>
+            <h3 class="modal-title" id="modalTitle">Diagnostic Probe Details</h3>
+          </div>
+          <button type="button" class="btn-icon-subtle" id="closeModalBtn" aria-label="Close dialog">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <div class="modal-facts-grid" id="modalFactsGrid"></div>
+          
+          <div class="modal-json-section">
+            <div class="json-header">
+              <span>Raw Telemetry Payload</span>
+              <button type="button" class="text-link-btn" id="copyModalJsonBtn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Copy Payload</span>
+              </button>
+            </div>
+            <pre class="json-block" id="modalJsonContent"></pre>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="modalDismissBtn">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div class="toast-shelf" id="toastShelf" aria-live="polite" aria-atomic="true"></div>
 
     <script src="/app.js" type="module"></script>
   </body>

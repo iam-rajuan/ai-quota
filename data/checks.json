@@ -1,1 +1,26 @@
-[]
+[
+  {
+    "id": "1feafc68-0fbd-471e-9d46-c022351faadf",
+    "checkedAt": "2026-10-14T06:21:07.330Z",
+    "provider": "Claude",
+    "model": "claude-haiku-4-5-20251001",
+    "ok": true,
+    "status": 200,
+    "code": "available",
+    "title": "Claude quota appears available",
+    "message": "The provider accepted a small test generation request.",
+    "keyFingerprint": "5828853ebbfc",
+    "latencyMs": 776,
+    "usage": {
+      "inputTokens": 11,
+      "outputTokens": 4,
+      "totalTokens": 15
+    },
+    "estimatedCostUsd": 0.000025,
+    "creditInfo": {
+      "label": "Generation access",
+      "value": "Available",
+      "detail": "This key can make a billable generation request with the selected model."
+    }
+  }
+]

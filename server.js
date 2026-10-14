@@ -63,8 +63,16 @@ app.post("/api/models/gemini", async (req, res) => {
 app.post("/api/check/openai", async (req, res) => {
   const apiKey = getString(req.body?.apiKey);
   if (!apiKey) return res.status(400).json(errorResult("missing_key", "OpenAI API key is required."));
+  
+  const startTime = Date.now();
   const modelResult = await resolveModel(apiKey, getString(req.body?.model), listOpenAIModels, "OpenAI");
-  if (!modelResult.ok) return res.json(modelResult);
+  if (!modelResult.ok) {
+    const latencyMs = Date.now() - startTime;
+    const result = enrichResult("OpenAI", modelResult, apiKey, "", latencyMs);
+    logCheckResult("OpenAI", result);
+    await saveCheck(result);
+    return res.json(result);
+  }
   const model = modelResult.model;
 
   logCheckStart("OpenAI", model, apiKey);
@@ -82,12 +90,14 @@ app.post("/api/check/openai", async (req, res) => {
       }),
     });
     const bodyText = await response.text();
-    const result = enrichResult("OpenAI", classifyProviderResponse("OpenAI", response.status, bodyText, model), apiKey);
+    const latencyMs = Date.now() - startTime;
+    const result = enrichResult("OpenAI", classifyProviderResponse("OpenAI", response.status, bodyText, model), apiKey, model, latencyMs);
     logCheckResult("OpenAI", result);
     await saveCheck(result);
     res.json(result);
   } catch (error) {
-    const result = enrichResult("OpenAI", errorResult("network_error", error.message || "OpenAI request failed."), apiKey, model);
+    const latencyMs = Date.now() - startTime;
+    const result = enrichResult("OpenAI", errorResult("network_error", error.message || "OpenAI request failed."), apiKey, model, latencyMs);
     logCheckResult("OpenAI", result, error);
     await saveCheck(result);
     res.json(result);
@@ -97,8 +107,16 @@ app.post("/api/check/openai", async (req, res) => {
 app.post("/api/check/anthropic", async (req, res) => {
   const apiKey = getString(req.body?.apiKey);
   if (!apiKey) return res.status(400).json(errorResult("missing_key", "Claude API key is required."));
+  
+  const startTime = Date.now();
   const modelResult = await resolveModel(apiKey, getString(req.body?.model), listAnthropicModels, "Claude");
-  if (!modelResult.ok) return res.json(modelResult);
+  if (!modelResult.ok) {
+    const latencyMs = Date.now() - startTime;
+    const result = enrichResult("Claude", modelResult, apiKey, "", latencyMs);
+    logCheckResult("Claude", result);
+    await saveCheck(result);
+    return res.json(result);
+  }
   const model = modelResult.model;
 
   logCheckStart("Claude", model, apiKey);
@@ -117,12 +135,14 @@ app.post("/api/check/anthropic", async (req, res) => {
       }),
     });
     const bodyText = await response.text();
-    const result = enrichResult("Claude", classifyProviderResponse("Claude", response.status, bodyText, model), apiKey);
+    const latencyMs = Date.now() - startTime;
+    const result = enrichResult("Claude", classifyProviderResponse("Claude", response.status, bodyText, model), apiKey, model, latencyMs);
     logCheckResult("Claude", result);
     await saveCheck(result);
     res.json(result);
   } catch (error) {
-    const result = enrichResult("Claude", errorResult("network_error", error.message || "Claude request failed."), apiKey, model);
+    const latencyMs = Date.now() - startTime;
+    const result = enrichResult("Claude", errorResult("network_error", error.message || "Claude request failed."), apiKey, model, latencyMs);
     logCheckResult("Claude", result, error);
     await saveCheck(result);
     res.json(result);
@@ -132,8 +152,16 @@ app.post("/api/check/anthropic", async (req, res) => {
 app.post("/api/check/gemini", async (req, res) => {
   const apiKey = getString(req.body?.apiKey);
   if (!apiKey) return res.status(400).json(errorResult("missing_key", "Gemini API key is required."));
+  
+  const startTime = Date.now();
   const modelResult = await resolveModel(apiKey, getString(req.body?.model), listGeminiModels, "Gemini");
-  if (!modelResult.ok) return res.json(modelResult);
+  if (!modelResult.ok) {
+    const latencyMs = Date.now() - startTime;
+    const result = enrichResult("Gemini", modelResult, apiKey, "", latencyMs);
+    logCheckResult("Gemini", result);
+    await saveCheck(result);
+    return res.json(result);
+  }
   const model = modelResult.model;
 
   logCheckStart("Gemini", model, apiKey);
@@ -148,12 +176,14 @@ app.post("/api/check/gemini", async (req, res) => {
       }),
     });
     const bodyText = await response.text();
-    const result = enrichResult("Gemini", classifyProviderResponse("Gemini", response.status, bodyText, model), apiKey);
+    const latencyMs = Date.now() - startTime;
+    const result = enrichResult("Gemini", classifyProviderResponse("Gemini", response.status, bodyText, model), apiKey, model, latencyMs);
     logCheckResult("Gemini", result);
     await saveCheck(result);
     res.json(result);
   } catch (error) {
-    const result = enrichResult("Gemini", errorResult("network_error", error.message || "Gemini request failed."), apiKey, model);
+    const latencyMs = Date.now() - startTime;
+    const result = enrichResult("Gemini", errorResult("network_error", error.message || "Gemini request failed."), apiKey, model, latencyMs);
     logCheckResult("Gemini", result, error);
     await saveCheck(result);
     res.json(result);
@@ -209,6 +239,7 @@ async function saveCheck(result) {
     title: result.title,
     message: result.message,
     keyFingerprint: result.keyFingerprint,
+    latencyMs: result.latencyMs || null,
     usage: result.usage || null,
     estimatedCostUsd: result.estimatedCostUsd,
     creditInfo: result.creditInfo || null,
@@ -229,8 +260,12 @@ function summarizeHistory(checks) {
     inputTokens: 0,
     outputTokens: 0,
     totalTokens: 0,
+    avgLatencyMs: 0,
     byProvider: {},
   };
+
+  let totalLatency = 0;
+  let latencyCount = 0;
 
   checks.forEach((check) => {
     const provider = check.provider || "Unknown";
@@ -242,12 +277,22 @@ function summarizeHistory(checks) {
       inputTokens: 0,
       outputTokens: 0,
       totalTokens: 0,
+      avgLatencyMs: 0,
+      _totalLatency: 0,
+      _latencyCount: 0,
     };
 
     const inputTokens = check.usage?.inputTokens || 0;
     const outputTokens = check.usage?.outputTokens || 0;
     const totalTokens = check.usage?.totalTokens || inputTokens + outputTokens;
     const estimatedCostUsd = check.estimatedCostUsd || 0;
+
+    if (typeof check.latencyMs === "number" && check.latencyMs > 0) {
+      totalLatency += check.latencyMs;
+      latencyCount += 1;
+      bucket._totalLatency += check.latencyMs;
+      bucket._latencyCount += 1;
+    }
 
     if ((check.checkedAt || "").startsWith(today)) summary.todayChecks += 1;
     if (check.ok) {
@@ -271,8 +316,12 @@ function summarizeHistory(checks) {
     summary.byProvider[provider] = bucket;
   });
 
+  summary.avgLatencyMs = latencyCount > 0 ? Math.round(totalLatency / latencyCount) : 0;
   summary.estimatedCostUsd = roundCost(summary.estimatedCostUsd);
   Object.values(summary.byProvider).forEach((bucket) => {
+    bucket.avgLatencyMs = bucket._latencyCount > 0 ? Math.round(bucket._totalLatency / bucket._latencyCount) : 0;
+    delete bucket._totalLatency;
+    delete bucket._latencyCount;
     bucket.estimatedCostUsd = roundCost(bucket.estimatedCostUsd);
   });
 
@@ -500,13 +549,14 @@ function logCheckResult(provider, result, error) {
   }
 }
 
-function enrichResult(provider, result, apiKey, fallbackModel = "") {
+function enrichResult(provider, result, apiKey, fallbackModel = "", latencyMs = null) {
   const enriched = {
     ...result,
     provider,
     model: result.model || fallbackModel || "",
     checkedAt: new Date().toISOString(),
     keyFingerprint: fingerprintKey(apiKey),
+    latencyMs: typeof latencyMs === "number" ? latencyMs : null,
   };
 
   enriched.estimatedCostUsd = estimateCost(provider, enriched.model, enriched.usage);
