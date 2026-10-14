@@ -57,7 +57,7 @@ app.post("/api/check/openai", async (req, res) => {
       }),
     });
     const bodyText = await response.text();
-    const result = classifyProviderResponse("OpenAI", response.status, bodyText);
+    const result = classifyProviderResponse("OpenAI", response.status, bodyText, model);
     logCheckResult("OpenAI", result);
     res.json(result);
   } catch (error) {
@@ -90,7 +90,7 @@ app.post("/api/check/anthropic", async (req, res) => {
       }),
     });
     const bodyText = await response.text();
-    const result = classifyProviderResponse("Claude", response.status, bodyText);
+    const result = classifyProviderResponse("Claude", response.status, bodyText, model);
     logCheckResult("Claude", result);
     res.json(result);
   } catch (error) {
@@ -119,7 +119,7 @@ app.post("/api/check/gemini", async (req, res) => {
       }),
     });
     const bodyText = await response.text();
-    const result = classifyProviderResponse("Gemini", response.status, bodyText);
+    const result = classifyProviderResponse("Gemini", response.status, bodyText, model);
     logCheckResult("Gemini", result);
     res.json(result);
   } catch (error) {
@@ -360,6 +360,7 @@ function logCheckResult(provider, result, error) {
     ok: result.ok,
     status: result.status || "n/a",
     code: result.code,
+    model: result.model || "n/a",
     message: result.message,
   });
 
@@ -374,8 +375,9 @@ function maskKey(apiKey) {
   return `${apiKey.slice(0, 7)}...${apiKey.slice(-4)}`;
 }
 
-function classifyProviderResponse(provider, status, bodyText) {
+function classifyProviderResponse(provider, status, bodyText, model = "") {
   const lower = bodyText.toLowerCase();
+  const parsed = parseJson(bodyText);
   const message = extractMessage(bodyText) || bodyText.slice(0, 500) || `HTTP ${status}`;
 
   if (status >= 200 && status < 300) {
@@ -383,9 +385,16 @@ function classifyProviderResponse(provider, status, bodyText) {
       ok: true,
       status,
       code: "available",
+      model,
       title: `${provider} quota appears available`,
       message: "The provider accepted a small test generation request.",
       rawMessage: message,
+      usage: extractUsage(provider, parsed),
+      creditInfo: {
+        label: "Generation access",
+        value: "Available",
+        detail: "This key can make a billable generation request with the selected model.",
+      },
     };
   }
 
@@ -394,9 +403,15 @@ function classifyProviderResponse(provider, status, bodyText) {
       ok: false,
       status,
       code: "auth_error",
+      model,
       title: `${provider} key is invalid or unauthorized`,
       message,
       rawMessage: message,
+      creditInfo: {
+        label: "Generation access",
+        value: "Blocked",
+        detail: "The key could not authenticate, so credit/quota cannot be checked.",
+      },
     };
   }
 
@@ -408,9 +423,15 @@ function classifyProviderResponse(provider, status, bodyText) {
       ok: false,
       status,
       code: "unsupported_model",
+      model,
       title: `${provider} model is not supported`,
       message,
       rawMessage: message,
+      creditInfo: {
+        label: "Generation access",
+        value: "Unknown",
+        detail: "The selected model failed before credit/quota could be confirmed.",
+      },
     };
   }
 
@@ -425,9 +446,15 @@ function classifyProviderResponse(provider, status, bodyText) {
       ok: false,
       status,
       code: "quota_or_rate_limit",
+      model,
       title: `${provider} quota/rate limit is not available`,
       message,
       rawMessage: message,
+      creditInfo: {
+        label: "Credit/quota signal",
+        value: "Unavailable",
+        detail: "The provider returned a quota, credit, or rate-limit error.",
+      },
     };
   }
 
@@ -435,21 +462,72 @@ function classifyProviderResponse(provider, status, bodyText) {
     ok: false,
     status,
     code: "provider_error",
+    model,
     title: `${provider} returned an error`,
     message,
     rawMessage: message,
+    creditInfo: {
+      label: "Generation access",
+      value: "Unknown",
+      detail: "The request failed for a provider-specific reason before quota could be confirmed.",
+    },
   };
 }
 
-function extractMessage(bodyText) {
-  try {
-    const parsed = JSON.parse(bodyText);
-    if (typeof parsed?.error?.message === "string") return parsed.error.message;
-    if (typeof parsed?.error === "string") return parsed.error;
-    if (typeof parsed?.message === "string") return parsed.message;
-  } catch {
-    return "";
+function extractUsage(provider, parsed) {
+  if (!parsed) return null;
+
+  if (provider === "OpenAI" && parsed.usage) {
+    return {
+      inputTokens: numberOrNull(parsed.usage.input_tokens),
+      outputTokens: numberOrNull(parsed.usage.output_tokens),
+      totalTokens: numberOrNull(parsed.usage.total_tokens),
+    };
   }
+
+  if (provider === "Claude" && parsed.usage) {
+    const inputTokens = numberOrNull(parsed.usage.input_tokens);
+    const outputTokens = numberOrNull(parsed.usage.output_tokens);
+    return {
+      inputTokens,
+      outputTokens,
+      totalTokens: addNullable(inputTokens, outputTokens),
+    };
+  }
+
+  if (provider === "Gemini" && parsed.usageMetadata) {
+    return {
+      inputTokens: numberOrNull(parsed.usageMetadata.promptTokenCount),
+      outputTokens: numberOrNull(parsed.usageMetadata.candidatesTokenCount),
+      totalTokens: numberOrNull(parsed.usageMetadata.totalTokenCount),
+    };
+  }
+
+  return null;
+}
+
+function numberOrNull(value) {
+  return Number.isFinite(value) ? value : null;
+}
+
+function addNullable(left, right) {
+  if (left === null && right === null) return null;
+  return (left || 0) + (right || 0);
+}
+
+function parseJson(bodyText) {
+  try {
+    return JSON.parse(bodyText);
+  } catch {
+    return null;
+  }
+}
+
+function extractMessage(bodyText) {
+  const parsed = parseJson(bodyText);
+  if (typeof parsed?.error?.message === "string") return parsed.error.message;
+  if (typeof parsed?.error === "string") return parsed.error;
+  if (typeof parsed?.message === "string") return parsed.message;
   return "";
 }
 

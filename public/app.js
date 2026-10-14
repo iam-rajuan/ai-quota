@@ -120,5 +120,47 @@ document.querySelectorAll("[data-provider]").forEach((panel) => {
     message.textContent = data.message || "";
 
     result.append(title, meta, message);
+
+    const facts = buildFacts(data);
+    if (facts.length) {
+      const list = document.createElement("dl");
+      list.className = "result-facts";
+
+      facts.forEach(([label, value]) => {
+        const item = document.createElement("div");
+        const term = document.createElement("dt");
+        const description = document.createElement("dd");
+
+        term.textContent = label;
+        description.textContent = value;
+        item.append(term, description);
+        list.append(item);
+      });
+
+      result.append(list);
+    }
+  }
+
+  function buildFacts(data) {
+    const facts = [];
+    if (data.model) facts.push(["Model", data.model]);
+    if (data.creditInfo) facts.push([data.creditInfo.label, data.creditInfo.value]);
+    if (data.creditInfo?.detail) facts.push(["Signal detail", data.creditInfo.detail]);
+
+    if (data.usage) {
+      facts.push(["Input tokens", formatNumber(data.usage.inputTokens)]);
+      facts.push(["Output tokens", formatNumber(data.usage.outputTokens)]);
+      facts.push(["Total tokens", formatNumber(data.usage.totalTokens)]);
+    }
+
+    if (!data.usage && data.ok) {
+      facts.push(["Token usage", "Provider did not return usage details for this response."]);
+    }
+
+    return facts;
+  }
+
+  function formatNumber(value) {
+    return Number.isFinite(value) ? value.toLocaleString() : "n/a";
   }
 });
