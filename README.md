@@ -31,8 +31,31 @@ Open:
 http://localhost:5177
 ```
 
+## Deploying to Vercel
+
+This repository is pre-configured for instant zero-config deployment on Vercel:
+
+### Option 1: Via Vercel CLI
+
+```powershell
+# Install Vercel CLI if not already installed
+npm i -g vercel
+
+# Deploy directly
+vercel
+```
+
+### Option 2: Via GitHub / Vercel Dashboard
+
+1. Push this repository to GitHub.
+2. Go to [vercel.com/new](https://vercel.com/new) and import the repo.
+3. Keep default settings (`Other` framework, root directory `./`).
+4. Click **Deploy**.
+
+Vercel automatically serves the static assets in `/public` through its global Edge Network and executes API checks via serverless functions defined in `/api`.
+
 ## Security & Privacy Guarantee
 
-- 100% local execution: keys are sent strictly to your local Node process (`localhost:5177`) to bypass browser CORS limitations.
-- Zero external tracking, zero cloud telemetry, air-gapped safe.
+- Keys are sent strictly to your server instance (`localhost` or your private Vercel deployment) to bypass browser CORS limitations.
+- Zero third-party telemetry, zero cloud tracking.
 

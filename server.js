@@ -6,8 +6,10 @@ import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const dataDir = path.join(__dirname, "data");
+const isVercel = Boolean(process.env.VERCEL);
+const dataDir = isVercel ? path.join("/tmp", "ai-quota-data") : path.join(__dirname, "data");
 const historyPath = path.join(dataDir, "checks.json");
+let inMemoryHistory = [];
 
 const app = express();
 const port = Number(process.env.PORT || 5177);
@@ -190,20 +192,24 @@ app.post("/api/check/gemini", async (req, res) => {
   }
 });
 
-const server = app.listen(port, () => {
-  console.log(`AI quota checker running at http://localhost:${port}`);
-});
+if (!isVercel) {
+  const server = app.listen(port, () => {
+    console.log(`AI quota checker running at http://localhost:${port}`);
+  });
 
-server.on("error", (error) => {
-  if (error.code === "EADDRINUSE") {
-    console.error(`Port ${port} is already in use. Stop the old server or run with another port, for example:`);
-    console.error(`$env:PORT=5180; npm run dev`);
+  server.on("error", (error) => {
+    if (error.code === "EADDRINUSE") {
+      console.error(`Port ${port} is already in use. Stop the old server or run with another port, for example:`);
+      console.error(`$env:PORT=5180; npm run dev`);
+      process.exit(1);
+    }
+
+    console.error("Server failed to start:", error);
     process.exit(1);
-  }
+  });
+}
 
-  console.error("Server failed to start:", error);
-  process.exit(1);
-});
+export default app;
 
 function getString(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -213,17 +219,21 @@ async function readHistory() {
   try {
     const text = await fs.readFile(historyPath, "utf8");
     const parsed = JSON.parse(text);
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed) ? parsed : inMemoryHistory;
   } catch (error) {
-    if (error.code === "ENOENT") return [];
-    console.error("Could not read history:", error);
-    return [];
+    return inMemoryHistory;
   }
 }
 
 async function writeHistory(checks) {
-  await fs.mkdir(dataDir, { recursive: true });
-  await fs.writeFile(historyPath, JSON.stringify(checks, null, 2), "utf8");
+  inMemoryHistory = checks;
+  try {
+    await fs.mkdir(dataDir, { recursive: true });
+    await fs.writeFile(historyPath, JSON.stringify(checks, null, 2), "utf8");
+  } catch (error) {
+    // Non-fatal on serverless if filesystem is restricted
+    if (!isVercel) console.error("Could not write history to disk:", error.message);
+  }
 }
 
 async function saveCheck(result) {
