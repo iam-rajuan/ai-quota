@@ -70,6 +70,102 @@ h2 {
   padding-top: 24px;
 }
 
+.tracker {
+  display: grid;
+  gap: 14px;
+  margin-top: 24px;
+  padding: 18px;
+  border: 1px solid #cfd8e6;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 16px 36px rgba(17, 24, 39, 0.06);
+}
+
+.tracker-head {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.tracker-head p {
+  margin-top: 5px;
+  color: #5b6575;
+  font-size: 13px;
+}
+
+.tracker-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.metrics div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #dce3ed;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.metrics span {
+  display: block;
+  color: #667085;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.metrics strong {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  color: #111827;
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-wrap {
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid #dce3ed;
+  border-radius: 6px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+th,
+td {
+  padding: 10px;
+  border-bottom: 1px solid #e5eaf2;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f8fafc;
+  color: #4b5565;
+  font-weight: 800;
+}
+
+td {
+  color: #263244;
+}
+
 .panel {
   display: grid;
   align-content: start;
@@ -205,6 +301,23 @@ button.secondary {
   color: #263248;
 }
 
+button.danger {
+  background: #dc2626;
+}
+
+.button-link {
+  display: inline-grid;
+  min-height: 42px;
+  align-items: center;
+  border: 1px solid #cbd5e3;
+  border-radius: 6px;
+  padding: 0 12px;
+  background: #ffffff;
+  color: #263248;
+  font-weight: 800;
+  text-decoration: none;
+}
+
 [data-result] {
   display: grid;
   gap: 8px;
@@ -276,6 +389,10 @@ button.secondary {
     grid-template-columns: 1fr;
   }
 
+  .metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .intro {
     align-items: flex-start;
   }
@@ -289,6 +406,22 @@ button.secondary {
 
   .model-actions {
     grid-template-columns: 1fr;
+  }
+
+  .tracker-head {
+    display: grid;
+  }
+
+  .tracker-actions {
+    justify-content: stretch;
+  }
+
+  .tracker-actions > * {
+    width: 100%;
+  }
+
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .result-facts div {

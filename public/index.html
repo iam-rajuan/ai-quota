@@ -21,6 +21,48 @@
         </div>
       </section>
 
+      <section class="tracker" aria-label="Usage tracking">
+        <div class="tracker-head">
+          <div>
+            <h2>Tracking</h2>
+            <p>Local history, token usage, estimated cost, and provider error intelligence.</p>
+          </div>
+          <div class="tracker-actions">
+            <button type="button" class="secondary" data-refresh-history>Refresh</button>
+            <a class="button-link" href="/api/history/export">Export JSON</a>
+            <button type="button" class="danger" data-clear-history>Clear</button>
+          </div>
+        </div>
+        <div class="metrics" data-summary>
+          <div><span>Total checks</span><strong>0</strong></div>
+          <div><span>Today</span><strong>0</strong></div>
+          <div><span>Success</span><strong>0</strong></div>
+          <div><span>Failed</span><strong>0</strong></div>
+          <div><span>Tokens</span><strong>0</strong></div>
+          <div><span>Est. cost</span><strong>$0.000000</strong></div>
+        </div>
+        <div class="history-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Provider</th>
+                <th>Status</th>
+                <th>Model</th>
+                <th>Tokens</th>
+                <th>Est. cost</th>
+                <th>Key</th>
+              </tr>
+            </thead>
+            <tbody data-history>
+              <tr>
+                <td colspan="7">No checks yet.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="grid" aria-label="Provider checks">
         <article class="panel" data-provider="openai">
           <div class="panel-head">

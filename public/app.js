@@ -10,6 +10,15 @@ const modelEndpointByProvider = {
   gemini: "/api/models/gemini",
 };
 
+const historyBody = document.querySelector("[data-history]");
+const summaryEl = document.querySelector("[data-summary]");
+const refreshHistoryButton = document.querySelector("[data-refresh-history]");
+const clearHistoryButton = document.querySelector("[data-clear-history]");
+
+refreshHistoryButton.addEventListener("click", loadHistory);
+clearHistoryButton.addEventListener("click", clearHistory);
+loadHistory();
+
 document.querySelectorAll("[data-provider]").forEach((panel) => {
   const provider = panel.dataset.provider;
   const button = panel.querySelector("[data-check]");
@@ -38,6 +47,7 @@ document.querySelectorAll("[data-provider]").forEach((panel) => {
       const data = await response.json();
       setState(data.ok ? "ok" : "error", data.ok ? "Available" : "Blocked");
       renderResult(data);
+      loadHistory();
     } catch (error) {
       setState("error", "Failed");
       renderResult({
@@ -153,6 +163,10 @@ document.querySelectorAll("[data-provider]").forEach((panel) => {
       facts.push(["Total tokens", formatNumber(data.usage.totalTokens)]);
     }
 
+    if (Number.isFinite(data.estimatedCostUsd)) {
+      facts.push(["Estimated cost", formatUsd(data.estimatedCostUsd)]);
+    }
+
     if (!data.usage && data.ok) {
       facts.push(["Token usage", "Provider did not return usage details for this response."]);
     }
@@ -164,3 +178,93 @@ document.querySelectorAll("[data-provider]").forEach((panel) => {
     return Number.isFinite(value) ? value.toLocaleString() : "n/a";
   }
 });
+
+async function loadHistory() {
+  try {
+    const response = await fetch("/api/history");
+    const data = await response.json();
+    renderSummary(data.summary);
+    renderHistory(data.checks);
+  } catch (error) {
+    historyBody.replaceChildren(historyRow([`Could not load history: ${error.message}`], 7));
+  }
+}
+
+async function clearHistory() {
+  const confirmed = window.confirm("Clear local check history? API keys are not stored, but this will remove all tracked results.");
+  if (!confirmed) return;
+
+  const response = await fetch("/api/history", { method: "DELETE" });
+  const data = await response.json();
+  renderSummary(data.summary);
+  renderHistory(data.checks);
+}
+
+function renderSummary(summary = {}) {
+  const values = [
+    summary.totalChecks || 0,
+    summary.todayChecks || 0,
+    summary.successfulChecks || 0,
+    summary.failedChecks || 0,
+    summary.totalTokens || 0,
+    formatUsd(summary.estimatedCostUsd || 0),
+  ];
+
+  summaryEl.querySelectorAll("strong").forEach((node, index) => {
+    node.textContent = index === 5 ? values[index] : formatNumber(values[index]);
+  });
+}
+
+function renderHistory(checks = []) {
+  if (!checks.length) {
+    historyBody.replaceChildren(historyRow(["No checks yet."], 7));
+    return;
+  }
+
+  historyBody.replaceChildren(
+    ...checks.slice(0, 50).map((check) =>
+      historyRow([
+        formatTime(check.checkedAt),
+        check.provider || "Unknown",
+        `${check.ok ? "OK" : "Blocked"} / ${check.code || "unknown"}`,
+        check.model || "n/a",
+        formatNumber(check.usage?.totalTokens),
+        Number.isFinite(check.estimatedCostUsd) ? formatUsd(check.estimatedCostUsd) : "n/a",
+        check.keyFingerprint || "n/a",
+      ])
+    )
+  );
+}
+
+function historyRow(values, colspan) {
+  const row = document.createElement("tr");
+
+  if (colspan) {
+    const cell = document.createElement("td");
+    cell.colSpan = colspan;
+    cell.textContent = values[0];
+    row.append(cell);
+    return row;
+  }
+
+  values.forEach((value) => {
+    const cell = document.createElement("td");
+    cell.textContent = value;
+    row.append(cell);
+  });
+
+  return row;
+}
+
+function formatTime(value) {
+  if (!value) return "n/a";
+  return new Date(value).toLocaleString();
+}
+
+function formatNumber(value) {
+  return Number.isFinite(value) ? value.toLocaleString() : "n/a";
+}
+
+function formatUsd(value) {
+  return Number.isFinite(value) ? `$${value.toFixed(6)}` : "n/a";
+}

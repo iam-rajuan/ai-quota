@@ -1,15 +1,40 @@
 import express from "express";
+import crypto from "node:crypto";
+import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const dataDir = path.join(__dirname, "data");
+const historyPath = path.join(dataDir, "checks.json");
 
 const app = express();
 const port = Number(process.env.PORT || 5177);
 
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(path.join(__dirname, "public")));
+
+app.get("/api/history", async (_req, res) => {
+  const checks = await readHistory();
+  res.json({
+    ok: true,
+    checks,
+    summary: summarizeHistory(checks),
+  });
+});
+
+app.get("/api/history/export", async (_req, res) => {
+  const checks = await readHistory();
+  res.setHeader("Content-Type", "application/json");
+  res.setHeader("Content-Disposition", "attachment; filename=\"ai-quota-history.json\"");
+  res.send(JSON.stringify({ exportedAt: new Date().toISOString(), checks }, null, 2));
+});
+
+app.delete("/api/history", async (_req, res) => {
+  await writeHistory([]);
+  res.json({ ok: true, checks: [], summary: summarizeHistory([]) });
+});
 
 app.post("/api/models/openai", async (req, res) => {
   const apiKey = getString(req.body?.apiKey);
@@ -57,12 +82,14 @@ app.post("/api/check/openai", async (req, res) => {
       }),
     });
     const bodyText = await response.text();
-    const result = classifyProviderResponse("OpenAI", response.status, bodyText, model);
+    const result = enrichResult("OpenAI", classifyProviderResponse("OpenAI", response.status, bodyText, model), apiKey);
     logCheckResult("OpenAI", result);
+    await saveCheck(result);
     res.json(result);
   } catch (error) {
-    const result = errorResult("network_error", error.message || "OpenAI request failed.");
+    const result = enrichResult("OpenAI", errorResult("network_error", error.message || "OpenAI request failed."), apiKey, model);
     logCheckResult("OpenAI", result, error);
+    await saveCheck(result);
     res.json(result);
   }
 });
@@ -90,12 +117,14 @@ app.post("/api/check/anthropic", async (req, res) => {
       }),
     });
     const bodyText = await response.text();
-    const result = classifyProviderResponse("Claude", response.status, bodyText, model);
+    const result = enrichResult("Claude", classifyProviderResponse("Claude", response.status, bodyText, model), apiKey);
     logCheckResult("Claude", result);
+    await saveCheck(result);
     res.json(result);
   } catch (error) {
-    const result = errorResult("network_error", error.message || "Claude request failed.");
+    const result = enrichResult("Claude", errorResult("network_error", error.message || "Claude request failed."), apiKey, model);
     logCheckResult("Claude", result, error);
+    await saveCheck(result);
     res.json(result);
   }
 });
@@ -119,12 +148,14 @@ app.post("/api/check/gemini", async (req, res) => {
       }),
     });
     const bodyText = await response.text();
-    const result = classifyProviderResponse("Gemini", response.status, bodyText, model);
+    const result = enrichResult("Gemini", classifyProviderResponse("Gemini", response.status, bodyText, model), apiKey);
     logCheckResult("Gemini", result);
+    await saveCheck(result);
     res.json(result);
   } catch (error) {
-    const result = errorResult("network_error", error.message || "Gemini request failed.");
+    const result = enrichResult("Gemini", errorResult("network_error", error.message || "Gemini request failed."), apiKey, model);
     logCheckResult("Gemini", result, error);
+    await saveCheck(result);
     res.json(result);
   }
 });
@@ -146,6 +177,106 @@ server.on("error", (error) => {
 
 function getString(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+async function readHistory() {
+  try {
+    const text = await fs.readFile(historyPath, "utf8");
+    const parsed = JSON.parse(text);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    if (error.code === "ENOENT") return [];
+    console.error("Could not read history:", error);
+    return [];
+  }
+}
+
+async function writeHistory(checks) {
+  await fs.mkdir(dataDir, { recursive: true });
+  await fs.writeFile(historyPath, JSON.stringify(checks, null, 2), "utf8");
+}
+
+async function saveCheck(result) {
+  const checks = await readHistory();
+  const record = {
+    id: crypto.randomUUID(),
+    checkedAt: result.checkedAt,
+    provider: result.provider,
+    model: result.model || "",
+    ok: result.ok,
+    status: result.status,
+    code: result.code,
+    title: result.title,
+    message: result.message,
+    keyFingerprint: result.keyFingerprint,
+    usage: result.usage || null,
+    estimatedCostUsd: result.estimatedCostUsd,
+    creditInfo: result.creditInfo || null,
+  };
+
+  checks.unshift(record);
+  await writeHistory(checks.slice(0, 500));
+}
+
+function summarizeHistory(checks) {
+  const today = new Date().toISOString().slice(0, 10);
+  const summary = {
+    totalChecks: checks.length,
+    todayChecks: 0,
+    successfulChecks: 0,
+    failedChecks: 0,
+    estimatedCostUsd: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    totalTokens: 0,
+    byProvider: {},
+  };
+
+  checks.forEach((check) => {
+    const provider = check.provider || "Unknown";
+    const bucket = summary.byProvider[provider] || {
+      totalChecks: 0,
+      successfulChecks: 0,
+      failedChecks: 0,
+      estimatedCostUsd: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0,
+    };
+
+    const inputTokens = check.usage?.inputTokens || 0;
+    const outputTokens = check.usage?.outputTokens || 0;
+    const totalTokens = check.usage?.totalTokens || inputTokens + outputTokens;
+    const estimatedCostUsd = check.estimatedCostUsd || 0;
+
+    if ((check.checkedAt || "").startsWith(today)) summary.todayChecks += 1;
+    if (check.ok) {
+      summary.successfulChecks += 1;
+      bucket.successfulChecks += 1;
+    } else {
+      summary.failedChecks += 1;
+      bucket.failedChecks += 1;
+    }
+
+    summary.estimatedCostUsd += estimatedCostUsd;
+    summary.inputTokens += inputTokens;
+    summary.outputTokens += outputTokens;
+    summary.totalTokens += totalTokens;
+
+    bucket.totalChecks += 1;
+    bucket.estimatedCostUsd += estimatedCostUsd;
+    bucket.inputTokens += inputTokens;
+    bucket.outputTokens += outputTokens;
+    bucket.totalTokens += totalTokens;
+    summary.byProvider[provider] = bucket;
+  });
+
+  summary.estimatedCostUsd = roundCost(summary.estimatedCostUsd);
+  Object.values(summary.byProvider).forEach((bucket) => {
+    bucket.estimatedCostUsd = roundCost(bucket.estimatedCostUsd);
+  });
+
+  return summary;
 }
 
 async function resolveModel(apiKey, requestedModel, listModels, provider) {
@@ -367,6 +498,67 @@ function logCheckResult(provider, result, error) {
   if (error?.stack) {
     console.error(error.stack);
   }
+}
+
+function enrichResult(provider, result, apiKey, fallbackModel = "") {
+  const enriched = {
+    ...result,
+    provider,
+    model: result.model || fallbackModel || "",
+    checkedAt: new Date().toISOString(),
+    keyFingerprint: fingerprintKey(apiKey),
+  };
+
+  enriched.estimatedCostUsd = estimateCost(provider, enriched.model, enriched.usage);
+  return enriched;
+}
+
+function fingerprintKey(apiKey) {
+  return crypto.createHash("sha256").update(apiKey).digest("hex").slice(0, 12);
+}
+
+function estimateCost(provider, model, usage) {
+  if (!usage) return null;
+
+  const pricing = getPricing(provider, model);
+  if (!pricing) return null;
+
+  const inputTokens = usage.inputTokens || 0;
+  const outputTokens = usage.outputTokens || 0;
+  return roundCost((inputTokens / 1_000_000) * pricing.input + (outputTokens / 1_000_000) * pricing.output);
+}
+
+function getPricing(provider, model) {
+  const normalized = model.toLowerCase();
+
+  if (provider === "OpenAI") {
+    if (normalized.includes("gpt-5-mini")) return { input: 0.25, output: 2.0 };
+    if (normalized.includes("gpt-5-nano")) return { input: 0.05, output: 0.4 };
+    if (normalized.includes("gpt-5")) return { input: 1.25, output: 10.0 };
+    if (normalized.includes("gpt-4.1-mini")) return { input: 0.4, output: 1.6 };
+    if (normalized.includes("gpt-4.1-nano")) return { input: 0.1, output: 0.4 };
+    if (normalized.includes("gpt-4.1")) return { input: 2.0, output: 8.0 };
+    if (normalized.includes("gpt-4o-mini")) return { input: 0.15, output: 0.6 };
+    if (normalized.includes("gpt-4o")) return { input: 2.5, output: 10.0 };
+  }
+
+  if (provider === "Claude") {
+    if (normalized.includes("haiku")) return { input: 0.8, output: 4.0 };
+    if (normalized.includes("sonnet")) return { input: 3.0, output: 15.0 };
+    if (normalized.includes("opus")) return { input: 15.0, output: 75.0 };
+  }
+
+  if (provider === "Gemini") {
+    if (normalized.includes("flash-lite")) return { input: 0.1, output: 0.4 };
+    if (normalized.includes("flash")) return { input: 0.3, output: 2.5 };
+    if (normalized.includes("pro")) return { input: 1.25, output: 10.0 };
+  }
+
+  return null;
+}
+
+function roundCost(value) {
+  return Math.round(value * 1_000_000) / 1_000_000;
 }
 
 function maskKey(apiKey) {
