@@ -1022,10 +1022,30 @@ function escapeHtml(str) {
     .replace(/'/g, "&#039;");
 }
 
+function updateEnvironmentInfo() {
+  const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+  const statusEl = document.querySelector("[data-server-status]");
+  const hostEl = document.querySelector("[data-server-host]");
+  const brandSub = document.querySelector(".brand-sub");
+
+  if (hostEl) {
+    hostEl.textContent = window.location.host;
+  }
+
+  if (statusEl) {
+    statusEl.textContent = isLocal ? `Local • Port ${window.location.port || "5177"}` : `${window.location.hostname} • Active`;
+  }
+
+  if (brandSub) {
+    brandSub.textContent = isLocal ? "Local API Sentinel • Real-Time Latency & Quota Radar" : "Cloud Sentinel • Real-Time Latency & Quota Radar";
+  }
+}
+
 // ============================================================================
 // Bootstrapper
 // ============================================================================
 document.addEventListener("DOMContentLoaded", () => {
+  updateEnvironmentInfo();
   initTheme();
   initSoundToggle();
   initKeyPersistence();
