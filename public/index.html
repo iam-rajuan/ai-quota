@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Quota Checker</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="intro">
+        <div>
+          <p class="eyebrow">Local Tool</p>
+          <h1>AI Quota Checker</h1>
+          <p class="subtext">
+            Paste a provider key, run a tiny generation request, and see whether quota is available.
+            Keys are sent only to this local server process and are not saved.
+          </p>
+        </div>
+      </section>
+
+      <section class="grid" aria-label="Provider checks">
+        <article class="panel" data-provider="openai">
+          <div class="panel-head">
+            <div>
+              <h2>OpenAI / Codex</h2>
+              <p>Checks OpenAI API quota with the Responses API.</p>
+            </div>
+            <span class="badge idle">Idle</span>
+          </div>
+          <label>
+            API key
+            <input type="password" autocomplete="off" placeholder="sk-..." data-key />
+          </label>
+          <label>
+            Model
+            <select data-model-select>
+              <option value="">Load models from key</option>
+            </select>
+          </label>
+          <div class="model-actions">
+            <button type="button" class="secondary" data-load-models>Load models</button>
+            <input type="text" placeholder="Manual model override" data-model />
+          </div>
+          <button data-check>Check OpenAI</button>
+          <pre data-result>Waiting for check.</pre>
+        </article>
+
+        <article class="panel" data-provider="anthropic">
+          <div class="panel-head">
+            <div>
+              <h2>Claude</h2>
+              <p>Checks Anthropic Claude API quota with a tiny message.</p>
+            </div>
+            <span class="badge idle">Idle</span>
+          </div>
+          <label>
+            API key
+            <input type="password" autocomplete="off" placeholder="sk-ant-..." data-key />
+          </label>
+          <label>
+            Model
+            <select data-model-select>
+              <option value="">Load models from key</option>
+            </select>
+          </label>
+          <div class="model-actions">
+            <button type="button" class="secondary" data-load-models>Load models</button>
+            <input type="text" placeholder="Manual model override" data-model />
+          </div>
+          <button data-check>Check Claude</button>
+          <pre data-result>Waiting for check.</pre>
+        </article>
+
+        <article class="panel" data-provider="gemini">
+          <div class="panel-head">
+            <div>
+              <h2>Gemini</h2>
+              <p>Checks Google Gemini API quota with a small content request.</p>
+            </div>
+            <span class="badge idle">Idle</span>
+          </div>
+          <label>
+            API key
+            <input type="password" autocomplete="off" placeholder="AIza..." data-key />
+          </label>
+          <label>
+            Model
+            <select data-model-select>
+              <option value="">Load models from key</option>
+            </select>
+          </label>
+          <div class="model-actions">
+            <button type="button" class="secondary" data-load-models>Load models</button>
+            <input type="text" placeholder="Manual model override" data-model />
+          </div>
+          <button data-check>Check Gemini</button>
+          <pre data-result>Waiting for check.</pre>
+        </article>
+      </section>
+    </main>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
