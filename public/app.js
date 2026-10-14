@@ -124,6 +124,7 @@ const dom = {
   statSuccessCount: document.querySelector('[data-stat="successCount"]'),
   statPassRateFill: document.getElementById("passRateFill"),
   statAvgLatency: document.querySelector('[data-stat="avgLatency"]'),
+  statAvgLatencySignal: document.getElementById("avgLatencySignal"),
   statTotalTokens: document.querySelector('[data-stat="totalTokens"]'),
   statTokenRatio: document.querySelector('[data-stat-sub="tokenRatio"]'),
   statEstimatedCost: document.querySelector('[data-stat="estimatedCost"]'),
@@ -186,14 +187,10 @@ function initSoundToggle() {
 }
 
 function updateSoundUI() {
-  const onIcon = dom.soundToggle.querySelector(".sound-on");
-  const offIcon = dom.soundToggle.querySelector(".sound-off");
   if (appState.soundEnabled) {
-    onIcon.classList.remove("hidden");
-    offIcon.classList.add("hidden");
+    dom.soundToggle.classList.remove("sound-muted");
   } else {
-    onIcon.classList.add("hidden");
-    offIcon.classList.remove("hidden");
+    dom.soundToggle.classList.add("sound-muted");
   }
 }
 
@@ -254,14 +251,25 @@ function loadSavedKeys() {
 }
 
 function validateKeySyntax(provider, input) {
+  const panel = input.closest("[data-provider]");
+  const badge = panel ? panel.querySelector("[data-key-badge]") : null;
   const val = input.value.trim();
   const prefixes = CONFIG.keyPrefixes[provider] || [];
   const isValid = prefixes.some((p) => val.startsWith(p)) && val.length > 15;
 
   if (isValid) {
     input.classList.add("valid-syntax");
+    if (badge) {
+      badge.classList.add("valid");
+      badge.querySelector(".syntax-text").textContent = `✓ Valid ${prefixes[0]} format`;
+    }
   } else {
     input.classList.remove("valid-syntax");
+    if (badge) {
+      badge.classList.remove("valid");
+      const defaultText = provider === "openai" ? "sk-... or sk-proj-..." : provider === "anthropic" ? "sk-ant-..." : "AIzaSy...";
+      badge.querySelector(".syntax-text").textContent = defaultText;
+    }
   }
 }
 
@@ -276,14 +284,44 @@ function initProviderPanels() {
     const keyInput = panel.querySelector("[data-key]");
     const modelInput = panel.querySelector("[data-model]");
     const modelSelect = panel.querySelector("[data-model-select]");
-    const resultArea = panel.querySelector("[data-result-area]");
-    const badge = panel.querySelector("[data-badge]");
+    const quickChips = panel.querySelectorAll("[data-model-chip]");
 
     // Key Syntax check on input
     keyInput.addEventListener("input", () => {
       validateKeySyntax(provider, keyInput);
       saveKeysToStorage();
     });
+
+    // Quick Model Chips click handler
+    quickChips.forEach((chip) => {
+      chip.addEventListener("click", () => {
+        quickChips.forEach((c) => c.classList.remove("active"));
+        chip.classList.add("active");
+        modelInput.value = chip.dataset.modelChip;
+        if (modelSelect) modelSelect.value = "";
+        audio.click();
+      });
+    });
+
+    // If user types in manual override, deactivate chips and clear dropdown selection
+    if (modelInput) {
+      modelInput.addEventListener("input", () => {
+        if (modelInput.value.trim().length > 0) {
+          quickChips.forEach((c) => c.classList.remove("active"));
+          if (modelSelect) modelSelect.value = "";
+        }
+      });
+    }
+
+    // If user changes dropdown select, clear manual override and chip active states
+    if (modelSelect) {
+      modelSelect.addEventListener("change", () => {
+        if (modelSelect.value) {
+          if (modelInput) modelInput.value = "";
+          quickChips.forEach((c) => c.classList.remove("active"));
+        }
+      });
+    }
 
     // Toggle password visibility
     const toggleVisBtn = panel.querySelector('[data-action="toggle-visibility"]');
@@ -351,7 +389,6 @@ function initProviderPanels() {
 // ============================================================================
 async function runSingleCheck(provider, panel) {
   const button = panel.querySelector("[data-check]");
-  const loadModelsButton = panel.querySelector("[data-load-models]");
   const keyInput = panel.querySelector("[data-key]");
   const modelInput = panel.querySelector("[data-model]");
   const modelSelect = panel.querySelector("[data-model-select]");
@@ -491,6 +528,11 @@ async function fetchProviderModels(provider, panel) {
     modelSelect.replaceChildren();
 
     if (data.models && data.models.length > 0) {
+      // Clear manual written model override and reset chips so queried models take effect
+      const modelInput = panel.querySelector("[data-model]");
+      if (modelInput) modelInput.value = "";
+      panel.querySelectorAll("[data-model-chip]").forEach((c) => c.classList.remove("active"));
+
       data.models.forEach((model, index) => {
         const option = document.createElement("option");
         option.value = model;
@@ -498,7 +540,9 @@ async function fetchProviderModels(provider, panel) {
         modelSelect.appendChild(option);
       });
 
-      showToast(`Loaded ${data.models.length} model(s) for ${provider.toUpperCase()}`, "success");
+      modelSelect.selectedIndex = 0;
+
+      showToast(`Loaded ${data.models.length} model(s) • Manual override cleared`, "success");
       audio.success();
     } else {
       const option = document.createElement("option");
@@ -511,21 +555,41 @@ async function fetchProviderModels(provider, panel) {
     audio.error();
   } finally {
     spinIcon.classList.add("hidden");
-    btnText.textContent = "Fetch Models";
+    btnText.textContent = "Query API Models";
     loadBtn.disabled = false;
   }
 }
 
 // ============================================================================
-// Diagnostic Result Rendering
+// Diagnostic Result Rendering & Syntax Highlighter
 // ============================================================================
+function highlightJson(obj) {
+  let json = typeof obj !== "string" ? JSON.stringify(obj, null, 2) : obj;
+  json = escapeHtml(json);
+  return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+    let cls = "json-number";
+    if (/^"/.test(match)) {
+      if (/:$/.test(match)) {
+        cls = "json-key";
+      } else {
+        cls = "json-string";
+      }
+    } else if (/true|false/.test(match)) {
+      cls = "json-boolean";
+    } else if (/null/.test(match)) {
+      cls = "json-null";
+    }
+    return `<span class="${cls}">${match}</span>`;
+  });
+}
+
 function renderCheckingPlaceholder(container, provider, model) {
   container.innerHTML = `
     <div class="diagnostic-placeholder">
-      <div class="spin-icon" style="width:24px;height:24px;margin-bottom:4px;">
+      <div class="spin-icon" style="width:26px;height:26px;margin-bottom:6px;color:var(--accent-primary);">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
       </div>
-      <strong style="color:var(--text-primary);font-size:13px;">Executing Probe against ${provider.toUpperCase()}</strong>
+      <strong style="color:var(--text-primary);font-size:13.5px;">Executing Handshake Probe (${provider.toUpperCase()})</strong>
       <span style="font-size:11px;font-family:var(--font-mono);color:var(--text-muted);">${escapeHtml(model || "Default Model")}</span>
     </div>
   `;
@@ -572,7 +636,7 @@ function renderDiagnosticResult(container, data, provider) {
     troubleshootHtml = `
       <div class="troubleshoot-box">
         <div class="troubleshoot-head">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:15px;height:15px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
           <span>Diagnostic Recommendation</span>
         </div>
         <p class="troubleshoot-body">${escapeHtml(advice.message)}</p>
@@ -630,7 +694,7 @@ function renderDiagnosticResult(container, data, provider) {
       <span>Raw Provider Response</span>
       <button type="button" class="text-link-btn" data-copy-raw>Copy JSON</button>
     </div>
-    <div class="raw-content-block">${escapeHtml(JSON.stringify(data, null, 2))}</div>
+    <div class="raw-content-block">${highlightJson(data)}</div>
   `;
 
   // Attach copy raw handler
@@ -666,7 +730,7 @@ function getTroubleshootAdvice(provider, code, rawMessage = "") {
 
   if (code === "unsupported_model" || msgLower.includes("not found")) {
     return {
-      message: "The requested model is either invalid, deprecated, or restricted on your API plan tier. Use 'Fetch Models' to load available identifiers.",
+      message: "The requested model is either invalid, deprecated, or restricted on your API plan tier. Use 'Query API Models' to load available identifiers.",
       link: null,
     };
   }
@@ -709,7 +773,25 @@ function renderTelemetryStats(summary = {}) {
   dom.statSuccessCount.textContent = `${successes} OK`;
   dom.statPassRateFill.style.width = `${passRate}%`;
 
-  dom.statAvgLatency.textContent = summary.avgLatencyMs ? `${summary.avgLatencyMs} ms` : "N/A";
+  const avgLat = summary.avgLatencyMs || 0;
+  dom.statAvgLatency.textContent = avgLat > 0 ? `${avgLat} ms` : "N/A";
+
+  if (dom.statAvgLatencySignal) {
+    if (avgLat === 0) {
+      dom.statAvgLatencySignal.textContent = "Standby";
+      dom.statAvgLatencySignal.style.color = "var(--text-muted)";
+    } else if (avgLat < 600) {
+      dom.statAvgLatencySignal.textContent = "⚡ Optimal";
+      dom.statAvgLatencySignal.style.color = "var(--status-ok)";
+    } else if (avgLat < 1600) {
+      dom.statAvgLatencySignal.textContent = "⚡ Moderate";
+      dom.statAvgLatencySignal.style.color = "var(--status-warning)";
+    } else {
+      dom.statAvgLatencySignal.textContent = "⚡ Slow";
+      dom.statAvgLatencySignal.style.color = "var(--status-error)";
+    }
+  }
+
   dom.statTotalTokens.textContent = (summary.totalTokens || 0).toLocaleString();
   dom.statTokenRatio.textContent = `${(summary.inputTokens || 0).toLocaleString()} In / ${(summary.outputTokens || 0).toLocaleString()} Out`;
 
@@ -724,14 +806,10 @@ function renderFilteredHistory() {
   const statusFilter = dom.statusFilter.value;
 
   const filtered = appState.historyCache.filter((item) => {
-    // Provider filter
     if (providerFilter !== "all" && item.provider !== providerFilter) return false;
-
-    // Status filter
     if (statusFilter === "ok" && !item.ok) return false;
     if (statusFilter === "error" && item.ok) return false;
 
-    // Text search filter
     if (searchQuery) {
       const matchTarget = `${item.provider} ${item.model} ${item.code} ${item.keyFingerprint} ${item.title} ${item.message}`.toLowerCase();
       if (!matchTarget.includes(searchQuery)) return false;
@@ -759,21 +837,16 @@ function renderFilteredHistory() {
   filtered.slice(0, 100).forEach((item) => {
     const tr = document.createElement("tr");
 
-    // Timestamp
     const timeFormatted = item.checkedAt ? new Date(item.checkedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "N/A";
     const dateFormatted = item.checkedAt ? new Date(item.checkedAt).toLocaleDateString([], { month: "short", day: "numeric" }) : "";
 
-    // Latency
     const latencyHtml = typeof item.latencyMs === "number" 
       ? `<span style="color:${item.latencyMs < 600 ? "var(--status-ok)" : item.latencyMs < 1600 ? "var(--status-warning)" : "var(--status-error)"};">⚡ ${item.latencyMs}ms</span>` 
       : "—";
 
-    // Tokens
     const inTokens = item.usage?.inputTokens || 0;
     const outTokens = item.usage?.outputTokens || 0;
     const tokensDisplay = (inTokens || outTokens) ? `${inTokens} / ${outTokens}` : "—";
-
-    // Cost
     const costDisplay = Number.isFinite(item.estimatedCostUsd) ? `$${item.estimatedCostUsd.toFixed(6)}` : "—";
 
     tr.innerHTML = `
@@ -806,7 +879,6 @@ function renderFilteredHistory() {
       </td>
     `;
 
-    // Row inspection modal trigger
     tr.querySelector("[data-inspect]").addEventListener("click", () => {
       openDetailModal(item);
     });
@@ -882,7 +954,7 @@ function openDetailModal(item) {
     </div>
   `;
 
-  dom.modalJsonContent.textContent = JSON.stringify(item, null, 2);
+  dom.modalJsonContent.innerHTML = highlightJson(item);
   dom.modal.classList.remove("hidden");
   audio.click();
 }

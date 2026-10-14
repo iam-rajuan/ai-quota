@@ -1,5 +1,25 @@
 [
   {
+    "id": "27962b27-df3e-47ac-bdde-697ccdb6cbfe",
+    "checkedAt": "2026-10-14T06:27:15.047Z",
+    "provider": "Claude",
+    "model": "claude-3-5-sonnet-20241022",
+    "ok": false,
+    "status": 404,
+    "code": "unsupported_model",
+    "title": "Claude model is not supported",
+    "message": "model: claude-3-5-sonnet-20241022",
+    "keyFingerprint": "5828853ebbfc",
+    "latencyMs": 926,
+    "usage": null,
+    "estimatedCostUsd": null,
+    "creditInfo": {
+      "label": "Generation access",
+      "value": "Unknown",
+      "detail": "The selected model failed before credit/quota could be confirmed."
+    }
+  },
+  {
     "id": "1feafc68-0fbd-471e-9d46-c022351faadf",
     "checkedAt": "2026-10-14T06:21:07.330Z",
     "provider": "Claude",
